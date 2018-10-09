@@ -1,10 +1,9 @@
-import matplotlib.pyplot as plt
 import Levenshtein
 import MySqlConnector
 from collections import Counter
 
 
-def getresult(year, gender, convergence, d_val):
+def getresult(year, gender, convergence, d_val, calculation_type):
     connector = MySqlConnector.MySqlConnector()
     results = connector.getBySql(year, gender)
     diff = 0
@@ -16,19 +15,31 @@ def getresult(year, gender, convergence, d_val):
         list_name = []
         list_set = []
         list_name.append(str(discharge[2]))
-        for j in range(7, 24):
-            val = float(discharge[j + 1]) - float(discharge[j])
-            if val > 0:
-                diff = 1
-            elif val < 0:
-                diff = -1
-            elif val == 0:
-                diff = 0
-            list_set.append(diff.__str__())
-        if list_set.count("0") <= convergence:
-            list_whole.append(list_name)
-            list_whole.append(list_set)
-            list_.append(list_whole)
+        if calculation_type == 0:
+            for j in range(7, 24):
+                val = float(discharge[j + 1]) - float(discharge[j])
+                if val > 0:
+                    diff = 1
+                elif val < 0:
+                    diff = -1
+                elif val == 0:
+                    diff = 0
+                list_set.append(diff.__str__())
+            if list_set.count("0") <= convergence:
+                list_whole.append(list_name)
+                list_whole.append(list_set)
+                list_.append(list_whole)
+        if calculation_type == 1:
+            for j in range(7, 24):
+                if float(discharge[j]) != 0:
+                    val = (float(discharge[j + 1]) - float(discharge[j])) / float(discharge[j])
+                    list_set.append(val)
+                else:
+                    list_set.append("infinite")
+            if list_set.count("infinite") <= convergence:
+                list_whole.append(list_name)
+                list_whole.append(list_set)
+                list_.append(list_whole)
     for i in range(0, len(list_)):
         for j in range(i + 1, len(list_)):
             name_a = list_.__getitem__(i).__getitem__(0)
@@ -40,10 +51,17 @@ def getresult(year, gender, convergence, d_val):
             # print("set_a:", set_a)
             # print("set_b:", set_b)
             # print("-------------------", Levenshtein.seqratio(set_a, set_b), "-------------------")
-            diff_val = Levenshtein.seqratio(set_a, set_b)
-            if filter_inclusion(name_a[0], name_b[0]) is True and diff_val >= d_val:
-                list_tmp = [name_a, name_b, set_a, set_b, diff_val]
-                list_top.append(list_tmp)
+            if calculation_type == 0:
+                diff_val = Levenshtein.seqratio(set_a, set_b)
+                if filter_inclusion(name_a[0], name_b[0]) is True and diff_val >= d_val:
+                    list_tmp = [name_a, name_b, set_a, set_b, diff_val]
+                    list_top.append(list_tmp)
+            if calculation_type == 1:
+                range_abs = determine_abs(set_a, set_b, d_val)
+                if filter_inclusion(name_a[0], name_b[0]) is True and range_abs is True:
+                    list_tmp = [name_a, name_b, set_a, set_b]
+                    list_top.append(list_tmp)
+
             # if diff_val < 0.06:
             #     list_tmp = [name_a, name_b, diff_val]
             #     list_bottom.append(list_tmp)
@@ -61,6 +79,27 @@ def getresult(year, gender, convergence, d_val):
     return list_count
     # for discharge in list_bottom:
     #     print("set_a:", discharge[0], "set_b:", discharge[1], "diff_val:", discharge[2])
+
+
+def determine_abs(set_a, set_b, d_val):
+    count = 0
+    for i in range(0, len(set_a)):
+        if set_a[i] == "infinite" or set_b[i] == "infinite":
+            pass
+        else:
+            if (set_a[i] >= 0 and set_b[i] >= 0) or (set_a[i] <= 0 and set_b[i] <= 0):
+                diff_val = abs(set_a[i] - set_b[i])
+                if diff_val > d_val:
+                    return False
+            else:
+                count = count+1
+                if count > 1:
+                    return False
+                else:
+                    diff_val = abs(set_a[i] - set_b[i])
+                    if diff_val > d_val:
+                        return False
+    return True
 
 
 def filter_inclusion(name_a, name_b):
@@ -136,7 +175,8 @@ def count_frequence():
     t = "Total"
     list_count_sort = []
     for year in years:
-        list_g = getresult(year, m, 2, 0.94)
+        # list_g = getresult(year, t, 2, 0.94, 0)
+        list_g = getresult(year, t, 2, 0.6, 1)
         print(year, Counter(list_g))
         list_count_sort.extend(list_g)
 
@@ -146,38 +186,13 @@ def count_frequence():
     # for i in result:
     #     print(i[0], i[1])
 
+
 count_frequence()
 # a = ["A00-B00", "A00-B00", "A00-B00", "A00-B00", "A00-B00"]
 # result = Counter(a)
 # print(result)
 # print(filter_inclusion("C00-D48", "C43-C44"))
-
-# a = ['0', '0','0','0','0','0','0','0','0','0','0','0','0','0','0','0','1']
+# a = ['0', '0','0','0','0','0','0','0','0','0','0','0','0','0','0','1','1']
 # b = ['0', '0','0','0','0','0','0','0','0','0','0','0','0','0','0','0','0']
 #
 # print(Levenshtein.seqratio(a, b))
-# plt.figure(figsize=(9,6))  # fig的宽高
-#
-# # The slices will be ordered and plotted counter-clockwise.
-# labels = [u'直接访问', u'外部链接', u'搜索引擎']
-# sizes = [160, 130, 110] # sum(sizes)不一定是100，会自动按照百分比调整
-# colors = ['yellowgreen', 'gold', 'lightskyblue']
-#
-# #explode 爆炸出来
-# explode = (0.05, 0.0, 0.0)  # 间距
-#
-# patches, l_texts, p_texts = plt.pie(sizes, explode=explode, labels=labels, colors=colors, labeldistance=0.8,
-#         autopct='%3.1f%%', shadow=True, startangle=90, pctdistance=0.6)
-#
-# plt.axis('equal') # 设置x，y轴刻度一致，这样饼图才能是圆的
-# plt.legend()
-#
-# """
-# # 设置labels和百分比文字大小
-# for t in l_texts:
-#     t.set_size(20)
-#
-# for t in p_texts:
-#     t.set_size(20)
-# """
-# plt.show()
